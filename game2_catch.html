@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>接爱心 · 心跳频率</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(180deg, #ffeef8 0%, #ffd6e7 50%, #ffc4dd 100%);
+            min-height: 100vh;
+            overflow: hidden;
+            touch-action: none;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        #gameCanvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+        }
+        .ui-layer {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 10;
+        }
+        .score-board {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(10px);
+            padding: 12px 28px;
+            border-radius: 30px;
+            box-shadow: 0 4px 20px rgba(233, 30, 99, 0.2);
+            text-align: center;
+            pointer-events: auto;
+        }
+        .score-label {
+            font-size: 12px;
+            color: #e91e63;
+            opacity: 0.8;
+        }
+        .score-value {
+            font-size: 28px;
+            font-weight: bold;
+            color: #c2185b;
+            line-height: 1.2;
+        }
+        .progress-bar {
+            width: 200px;
+            height: 6px;
+            background: rgba(233, 30, 99, 0.15);
+            border-radius: 3px;
+            margin-top: 8px;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #e91e63, #f06292);
+            border-radius: 3px;
+            transition: width 0.3s ease;
+            width: 0%;
+        }
+        .progress-text {
+            font-size: 11px;
+            color: #e91e63;
+            margin-top: 4px;
+        }
+        .game-title {
+            position: absolute;
+            top: 90px;
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+            color: #c2185b;
+            opacity: 0.7;
+        }
+        .game-title h2 {
+            font-size: 16px;
+            font-weight: 600;
+        }
+        .game-title p {
+            font-size: 12px;
+            margin-top: 2px;
+        }
+        .start-screen, .win-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(12px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.5s ease;
+        }
+        .start-screen.show, .win-screen.show {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .modal-card {
+            background: linear-gradient(135deg, #fff5f8, #ffe0ec);
+            border-radius: 24px;
+            padding: 36px 28px;
+            max-width: 340px;
+            width: 85%;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(194, 24, 89, 0.25);
+            transform: scale(0.9);
+            transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .start-screen.show .modal-card, .win-screen.show .modal-card {
+            transform: scale(1);
+        }
+        .modal-icon {
+            font-size: 48px;
+            margin-bottom: 12px;
+            animation: float 2s ease-in-out infinite;
+        }
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-8px); }
+        }
+        .modal-title {
+            font-size: 22px;
+            color: #c2185b;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .modal-text {
+            font-size: 14px;
+            color: #555;
+            line-height: 1.7;
+            margin-bottom: 20px;
+        }
+        .btn {
+            padding: 12px 32px;
+            border: none;
+            border-radius: 24px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-family: inherit;
+            pointer-events: auto;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #e91e63, #c2185b);
+            color: white;
+            box-shadow: 0 4px 16px rgba(233, 30, 99, 0.3);
+        }
+        .btn-primary:active {
+            transform: scale(0.95);
+        }
+        .btn-secondary {
+            background: rgba(255,255,255,0.6);
+            color: #c2185b;
+            border: 1px solid rgba(233, 30, 99, 0.3);
+            margin-top: 10px;
+        }
+        .combo-text {
+            position: absolute;
+            font-size: 20px;
+            font-weight: bold;
+            color: #e91e63;
+            pointer-events: none;
+            animation: comboPop 0.8s ease-out forwards;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        @keyframes comboPop {
+            0% { transform: scale(0.5) translateY(0); opacity: 0; }
+            30% { transform: scale(1.2) translateY(-10px); opacity: 1; }
+            100% { transform: scale(1) translateY(-40px); opacity: 0; }
+        }
+        .heart-particle {
+            position: absolute;
+            font-size: 16px;
+            pointer-events: none;
+            animation: heartFloat 1s ease-out forwards;
+        }
+        @keyframes heartFloat {
+            0% { transform: scale(1) translateY(0); opacity: 1; }
+            100% { transform: scale(0.5) translateY(-60px); opacity: 0; }
+        }
+        .qr-placeholder {
+            width: 100px;
+            height: 100px;
+            background: white;
+            border-radius: 10px;
+            margin: 16px auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px dashed #e91e63;
+            color: #e91e63;
+            font-size: 11px;
+        }
+        .stage-dots {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 12px;
+        }
+        .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: rgba(233, 30, 99, 0.3);
+        }
+        .dot.active {
+            background: #e91e63;
+            box-shadow: 0 0 8px rgba(233, 30, 99, 0.5);
+        }
+        .hint-text {
+            font-size: 12px;
+            color: #888;
+            margin-top: 8px;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+
+    <div class="ui-layer">
+        <div class="score-board">
+            <div class="score-label">已接住爱心</div>
+            <div class="score-value" id="scoreValue">0</div>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+            <div class="progress-text" id="progressText">0 / 30</div>
+        </div>
+        <div class="game-title">
+            <h2>💝 接爱心 · 心跳频率</h2>
+            <p>点击掉落的爱心，收集30个</p>
+        </div>
+    </div>
+
+    <!-- 开始界面 -->
+    <div class="start-screen show" id="startScreen">
+        <div class="modal-card">
+            <div class="modal-icon">💝</div>
+            <div class="modal-title">接爱心 · 心跳频率</div>
+            <div class="modal-text">
+                屏幕上会不断掉落爱心❤️<br>
+                用手指点击接住它们<br>
+                收集 <b>30</b> 个爱心即可过关！
+            </div>
+            <button class="btn btn-primary" onclick="startGame()">开始游戏</button>
+            <div class="stage-dots">
+                <div class="dot active"></div>
+                <div class="dot active"></div>
+                <div class="dot"></div>
+            </div>
+            <div class="hint-text">第二关 · 共三关</div>
+        </div>
+    </div>
+
+    <!-- 胜利界面 -->
+    <div class="win-screen" id="winScreen">
+        <div class="modal-card">
+            <div class="modal-icon" style="animation: heartbeat 1s ease-in-out infinite;">💍</div>
+            <div class="modal-title">你接住了我所有的爱！</div>
+            <div class="modal-text">
+                每一颗爱心都是我想对你说的话<br>
+                现在，轮到我来守护你了
+            </div>
+            <a href="game3_quiz.html" style="text-decoration:none;">
+                <button class="btn btn-primary" style="margin-top:12px;padding:12px 32px;font-size:15px;border:none;border-radius:24px;background:linear-gradient(135deg,#e91e63,#c2185b);color:white;font-weight:600;cursor:pointer;box-shadow:0 4px 16px rgba(233,30,99,0.3);">🔐 解锁最终惊喜</button>
+            </a>
+            <div class="hint-text" style="margin-top:10px;">点击按钮，解锁最终惊喜 →</div>
+            <button class="btn btn-secondary" onclick="restartGame()" style="margin-top:12px;">再玩一次</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreValue = document.getElementById('scoreValue');
+        const progressFill = document.getElementById('progressFill');
+        const progressText = document.getElementById('progressText');
+        const startScreen = document.getElementById('startScreen');
+        const winScreen = document.getElementById('winScreen');
+
+        let W, H;
+        let score = 0;
+        const TARGET = 30;
+        let hearts = [];
+        let particles = [];
+        let gameRunning = false;
+        let spawnTimer = 0;
+        let spawnInterval = 60; // 帧数，初始每1秒生成一个
+        let frame = 0;
+        let combo = 0;
+        let comboTimer = 0;
+
+        function resize() {
+            W = canvas.width = window.innerWidth;
+            H = canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        // 爱心类
+        class Heart {
+            constructor() {
+                this.x = Math.random() * (W - 60) + 30;
+                this.y = -40;
+                this.size = Math.random() * 15 + 25; // 25-40
+                this.speed = Math.random() * 1.5 + 1.5; // 1.5-3
+                this.wobble = Math.random() * Math.PI * 2;
+                this.wobbleSpeed = Math.random() * 0.05 + 0.02;
+                this.wobbleAmp = Math.random() * 20 + 10;
+                this.rotation = Math.random() * Math.PI * 2;
+                this.rotSpeed = (Math.random() - 0.5) * 0.04;
+                this.opacity = 1;
+                this.type = Math.random() > 0.85 ? 'gold' : 'red'; // 15%概率金色爱心
+                this.clicked = false;
+            }
+            update() {
+                this.y += this.speed;
+                this.wobble += this.wobbleSpeed;
+                this.x += Math.sin(this.wobble) * 0.5;
+                this.rotation += this.rotSpeed;
+                if (this.y > H + 50) {
+                    this.clicked = true; // 标记为已处理（掉出屏幕）
+                    combo = 0; // 连击中断
+                }
+            }
+            draw() {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.rotation);
+                ctx.globalAlpha = this.opacity;
+
+                if (this.type === 'gold') {
+                    ctx.fillStyle = '#FFD700';
+                    ctx.shadowColor = '#FFD700';
+                } else {
+                    ctx.fillStyle = '#e91e63';
+                    ctx.shadowColor = '#e91e63';
+                }
+                ctx.shadowBlur = 15;
+
+                // 绘制爱心形状
+                const s = this.size;
+                ctx.beginPath();
+                ctx.moveTo(0, s * 0.3);
+                ctx.bezierCurveTo(-s * 0.5, -s * 0.2, -s * 0.5, -s * 0.6, 0, -s * 0.3);
+                ctx.bezierCurveTo(s * 0.5, -s * 0.6, s * 0.5, -s * 0.2, 0, s * 0.3);
+                ctx.closePath();
+                ctx.fill();
+
+                // 高光
+                ctx.fillStyle = 'rgba(255,255,255,0.3)';
+                ctx.beginPath();
+                ctx.ellipse(-s * 0.15, -s * 0.25, s * 0.1, s * 0.08, -0.5, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.restore();
+            }
+            contains(px, py) {
+                const dx = px - this.x;
+                const dy = py - this.y;
+                return Math.sqrt(dx * dx + dy * dy) < this.size * 1.2;
+            }
+        }
+
+        // 粒子类（点击爱心后的爆炸效果）
+        class Particle {
+            constructor(x, y, color) {
+                this.x = x;
+                this.y = y;
+                this.vx = (Math.random() - 0.5) * 6;
+                this.vy = (Math.random() - 0.5) * 6;
+                this.life = 1;
+                this.decay = Math.random() * 0.02 + 0.015;
+                this.size = Math.random() * 6 + 3;
+                this.color = color;
+                this.shape = Math.random() > 0.5 ? 'heart' : 'circle';
+            }
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.vy += 0.1; // 重力
+                this.life -= this.decay;
+            }
+            draw() {
+                ctx.save();
+                ctx.globalAlpha = this.life;
+                ctx.fillStyle = this.color;
+                if (this.shape === 'heart') {
+                    const s = this.size;
+                    ctx.translate(this.x, this.y);
+                    ctx.beginPath();
+                    ctx.moveTo(0, s * 0.3);
+                    ctx.bezierCurveTo(-s * 0.5, -s * 0.2, -s * 0.5, -s * 0.6, 0, -s * 0.3);
+                    ctx.bezierCurveTo(s * 0.5, -s * 0.6, s * 0.5, -s * 0.2, 0, s * 0.3);
+                    ctx.closePath();
+                    ctx.fill();
+                } else {
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                ctx.restore();
+            }
+        }
+
+        // 创建点击特效
+        function createClickEffect(x, y, isGold) {
+            const color = isGold ? '#FFD700' : '#e91e63';
+            for (let i = 0; i < 8; i++) {
+                particles.push(new Particle(x, y, color));
+            }
+            // 飘字
+            const comboEl = document.createElement('div');
+            comboEl.className = 'combo-text';
+            comboEl.style.left = x + 'px';
+            comboEl.style.top = y + 'px';
+            if (combo >= 5) {
+                comboEl.textContent = '🔥 x' + combo;
+                comboEl.style.color = '#ff5722';
+            } else if (combo >= 3) {
+                comboEl.textContent = '❤️ +' + (isGold ? 2 : 1);
+            } else {
+                comboEl.textContent = '+' + (isGold ? 2 : 1);
+            }
+            document.body.appendChild(comboEl);
+            setTimeout(() => comboEl.remove(), 800);
+
+            // 小爱心飘上去
+            for (let i = 0; i < 3; i++) {
+                const h = document.createElement('div');
+                h.className = 'heart-particle';
+                h.textContent = '❤️';
+                h.style.left = (x + (Math.random() - 0.5) * 40) + 'px';
+                h.style.top = y + 'px';
+                h.style.animationDelay = (i * 0.1) + 's';
+                document.body.appendChild(h);
+                setTimeout(() => h.remove(), 1000);
+            }
+        }
+
+        function startGame() {
+            startScreen.classList.remove('show');
+            gameRunning = true;
+            score = 0;
+            combo = 0;
+            hearts = [];
+            particles = [];
+            spawnInterval = 55;
+            updateUI();
+            loop();
+        }
+
+        function restartGame() {
+            winScreen.classList.remove('show');
+            startScreen.classList.add('show');
+            gameRunning = false;
+            ctx.clearRect(0, 0, W, H);
+        }
+
+        function updateUI() {
+            scoreValue.textContent = score;
+            const pct = Math.min((score / TARGET) * 100, 100);
+            progressFill.style.width = pct + '%';
+            progressText.textContent = score + ' / ' + TARGET;
+        }
+
+        function checkWin() {
+            if (score >= TARGET) {
+                gameRunning = false;
+                setTimeout(() => {
+                    winScreen.classList.add('show');
+                }, 500);
+            }
+        }
+
+        // 点击/触摸处理
+        function handleInput(e) {
+            if (!gameRunning) return;
+            e.preventDefault();
+            const rect = canvas.getBoundingClientRect();
+            let clientX, clientY;
+            if (e.touches) {
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+            } else {
+                clientX = e.clientX;
+                clientY = e.clientY;
+            }
+            const x = clientX - rect.left;
+            const y = clientY - rect.top;
+
+            let hit = false;
+            for (let i = hearts.length - 1; i >= 0; i--) {
+                const h = hearts[i];
+                if (!h.clicked && h.contains(x, y)) {
+                    h.clicked = true;
+                    combo++;
+                    comboTimer = 60; // 1秒内继续接算连击
+                    const add = h.type === 'gold' ? 2 : 1;
+                    score += add;
+                    createClickEffect(h.x, h.y, h.type === 'gold');
+                    updateUI();
+                    hit = true;
+                    checkWin();
+                    break; // 一次只接一个
+                }
+            }
+
+            if (!hit) {
+                combo = 0;
+            }
+        }
+
+        canvas.addEventListener('mousedown', handleInput);
+        canvas.addEventListener('touchstart', handleInput, {passive: false});
+
+        function loop() {
+            if (!gameRunning) return;
+            frame++;
+
+            // 连击计时
+            if (comboTimer > 0) {
+                comboTimer--;
+            } else {
+                combo = 0;
+            }
+
+            // 生成爱心（随分数增加速度）
+            spawnTimer++;
+            const currentInterval = Math.max(20, spawnInterval - Math.floor(score / 5) * 3);
+            if (spawnTimer >= currentInterval) {
+                spawnTimer = 0;
+                hearts.push(new Heart());
+                // 连击高时额外生成
+                if (combo >= 5 && Math.random() > 0.5) {
+                    setTimeout(() => hearts.push(new Heart()), 200);
+                }
+            }
+
+            ctx.clearRect(0, 0, W, H);
+
+            // 背景装饰（淡色小爱心）
+            ctx.save();
+            ctx.globalAlpha = 0.08;
+            ctx.fillStyle = '#e91e63';
+            for (let i = 0; i < 5; i++) {
+                const bx = (frame * 0.5 + i * 200) % W;
+                const by = (Math.sin(frame * 0.01 + i) * 50 + H * 0.3 + i * 100) % H;
+                const bs = 15;
+                ctx.beginPath();
+                ctx.moveTo(bx, by + bs * 0.3);
+                ctx.bezierCurveTo(bx - bs * 0.5, by - bs * 0.2, bx - bs * 0.5, by - bs * 0.6, bx, by - bs * 0.3);
+                ctx.bezierCurveTo(bx + bs * 0.5, by - bs * 0.6, bx + bs * 0.5, by - bs * 0.2, bx, by + bs * 0.3);
+                ctx.closePath();
+                ctx.fill();
+            }
+            ctx.restore();
+
+            // 更新和绘制爱心
+            for (let i = hearts.length - 1; i >= 0; i--) {
+                const h = hearts[i];
+                h.update();
+                if (h.clicked && h.y > H + 50) {
+                    hearts.splice(i, 1);
+                    continue;
+                }
+                h.draw();
+            }
+
+            // 更新和绘制粒子
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.update();
+                p.draw();
+                if (p.life <= 0) {
+                    particles.splice(i, 1);
+                }
+            }
+
+            requestAnimationFrame(loop);
+        }
+    </script>
+</body>
+</html>
